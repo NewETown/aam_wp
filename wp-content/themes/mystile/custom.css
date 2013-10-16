@@ -29,8 +29,8 @@ p.demo_store {
   z-index: 99;
 }
 
-li {
-	padding: inherit;
+.entry-content > ul {
+	margin-left: 3em;
 }
 
 /* 
