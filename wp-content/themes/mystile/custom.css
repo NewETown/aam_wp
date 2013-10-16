@@ -13,6 +13,10 @@ from style.css to this file, and modify it to your liking. */
 GLOBAL STYLES
 ----------------
 Add styles beneath this line that you want to be applied across your entire site */
+* {
+	border-radius: 0;
+}
+
 p.demo_store {
   background: #4d65a4;
   position: fixed;
