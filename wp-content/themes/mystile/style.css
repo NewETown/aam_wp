@@ -134,6 +134,7 @@ dt,
 dd,
 ol,
 ul,
+li,
 fieldset,
 form,
 label,
@@ -168,12 +169,6 @@ audio,
 video {
   margin: 0;
   padding: 0;
-  border: 0;
-  font-size: 100%;
-  vertical-align: baseline;
-}
-li {
-  margin: 0;
   border: 0;
   font-size: 100%;
   vertical-align: baseline;
