@@ -13,7 +13,7 @@ from style.css to this file, and modify it to your liking. */
 GLOBAL STYLES
 ----------------
 Add styles beneath this line that you want to be applied across your entire site */
-* {
+.* {
   .border-radius: 0 !important;
 }
 
@@ -29,15 +29,15 @@ p.demo_store {
   z-index: 99;
 }
 
+li {
+	padding: inherit;
+}
+
 /* 
 DESKTOP STYLES
 -----------------
 Add styles inside the media query below that you only want to be applied to the desktop layout of your site */
 
 @media only screen and (min-width: 768px) {
-	/* Desktop styles go here */
-	* {
-	  .border-radius: 0 !important;
-	}
 
 }
