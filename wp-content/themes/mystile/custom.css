@@ -14,7 +14,7 @@ GLOBAL STYLES
 ----------------
 Add styles beneath this line that you want to be applied across your entire site */
 * {
-	border-radius: 0;
+  .border-radius: 0 !important;
 }
 
 p.demo_store {
