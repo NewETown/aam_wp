@@ -13,7 +13,7 @@ from style.css to this file, and modify it to your liking. */
 GLOBAL STYLES
 ----------------
 Add styles beneath this line that you want to be applied across your entire site */
-.* {
+* {
   .border-radius: 0 !important;
 }
 
@@ -29,7 +29,7 @@ p.demo_store {
   z-index: 99;
 }
 
-.entry-content > ul {
+.entry-content > ul, .entry > ul {
 	margin-left: 3em;
 }
 
