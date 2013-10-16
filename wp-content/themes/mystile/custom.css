@@ -22,7 +22,7 @@ p.demo_store {
   text-align: center;
   color: #fff;
   padding: 1em;
-  z-index: 3;
+  z-index: 99;
 }
 
 /* 
