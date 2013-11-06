@@ -561,7 +561,7 @@ ul.nav li a {
   margin-right: .618em;
   font-family: "icomoon";
   font-size: 1em;
-  content: "£";
+  /*content: "£";*/
   font-weight: normal;
 }
 #top .wc-nav li.cart a .contents {
