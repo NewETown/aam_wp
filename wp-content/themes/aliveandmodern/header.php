@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
   <head>
-  <title><?php wp_title('|',1,'right'); ?> <?php bloginfo('name'); ?></title>
+  <title><?php bloginfo('name'); ?></title>
   <link rel="SHORTCUT ICON" href="img/favicon.png">
   <link href='http://fonts.googleapis.com/css?family=Oxygen:400,300,700' rel='stylesheet' type='text/css'>
   <link href="<?php bloginfo('stylesheet_url');?>" rel="stylesheet">
