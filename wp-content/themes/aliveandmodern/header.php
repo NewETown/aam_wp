@@ -27,9 +27,9 @@
       <a class="navbar-brand" href="<?php echo get_option('home') ?>"><span style="color:#089909;">Alive</span> and <span style="color:black">Modern</span></a>
     </div>
     <div class="navbar-collapse collapse">
-      <ul id="nav-buttons" class="nav navbar-nav">
-        <?php wp_list_pages(array('title_li' =>  '', 'exclude' => 6)); ?>
-      </ul>
+      <!-- <ul id="nav-buttons" class="nav navbar-nav"> -->
+        <?php wp_nav_menu( array( 'theme_location' => 'menu-1', 'sort_column' => 'menu_order', 'menu_class' => 'nav navbar-nav', 'menu_id' => 'nav-buttons' ) ); ?>
+      <!-- </ul> -->
     </div> <!-- /.navbar-collapse -->
   </div> <!-- </nav> -->
 
