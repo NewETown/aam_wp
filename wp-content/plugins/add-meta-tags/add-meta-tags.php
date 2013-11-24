@@ -2,14 +2,33 @@
 /*
 Plugin Name: Add Meta Tags
 Plugin URI: http://www.g-loaded.eu/2006/01/05/add-meta-tags-wordpress-plugin/
-Description: Adds the <em>Description</em> and <em>Keywords</em> XHTML META tags to your blog's <em>front page</em>, posts, pages, category-based archives and tag-based archives. Also adds <em>Opengraph</em> and <em>Dublin Core</em> metadata on posts and pages.
-Version: 2.3.7
+Description: Add basic meta tags and also Opengraph, Schema.org Microdata, Twitter Cards and Dublin Core metadata to optimize your web site for better SEO.
+Version: 2.4.1
 Author: George Notaras
 Author URI: http://www.g-loaded.eu/
 License: Apache License v2
 */
 
 /**
+ *  This file is part of the Add-Meta-Tags distribution package.
+ *
+ *  Add-Meta-Tags is an extension for the WordPress publishing platform.
+ *
+ *  Homepage:
+ *  - http://wordpress.org/plugins/add-meta-tags/
+ *  Documentation:
+ *  - http://www.codetrax.org/projects/wp-add-meta-tags/wiki
+ *  Development Web Site and Bug Tracker:
+ *  - http://www.codetrax.org/projects/wp-add-meta-tags
+ *  Main Source Code Repository (Mercurial):
+ *  - https://bitbucket.org/gnotaras/wordpress-add-meta-tags
+ *  Mirror repository (Git):
+ *  - https://github.com/gnotaras/wordpress-add-meta-tags
+ *  Historical plugin home:
+ *  - http://www.g-loaded.eu/2006/01/05/add-meta-tags-wordpress-plugin/
+ *
+ *  Licensing Information
+ *
  *  Copyright 2006-2013 George Notaras <gnot@g-loaded.eu>, CodeTRAX.org
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +42,9 @@ License: Apache License v2
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
-*/
+ *
+ *  The NOTICE file contains additional licensing and copyright information.
+ */
 
 
 // Store plugin directory
@@ -68,16 +89,19 @@ add_filter( 'plugin_action_links', 'amt_plugin_actions', 10, 2 );
  */
 function amt_custom_title_tag($title) {
 
-    // Get current post object
-    $post = get_queried_object();
-
-    // Check if metadata is supported on this content type.
-    $post_type = get_post_type( $post );
-    if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
-        return $title;
-    }
-
     if ( is_singular() || amt_is_static_front_page() || amt_is_static_home() ) {
+
+        // Get current post object
+        $post = get_queried_object();
+        if ( is_null( $post ) ) {
+            return $title;
+        }
+
+        // Check if metadata is supported on this content type.
+        $post_type = get_post_type( $post );
+        if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
+            return $title;
+        }
         
         $custom_title = amt_get_post_meta_title( $post->ID );
         if ( !empty($custom_title) ) {
@@ -110,9 +134,9 @@ function amt_get_metadata_head() {
         if (
             ( is_search() && ($options["noindex_search_results"] == "1") )  ||          // Search results
             ( is_date() && ($options["noindex_date_archives"] == "1") )  ||             // Date and time archives
-            ( is_category() && ($options["noindex_category_archives"] == "1") )  ||     // Category archives
-            ( is_tag() && ($options["noindex_tag_archives"] == "1") )  ||               // Tag archives
-            ( is_author() && ($options["noindex_author_archives"] == "1") )             // Author archives
+            ( is_category() && is_paged() && ($options["noindex_category_archives"] == "1") )  ||     // Category archives (except 1st page)
+            ( is_tag() && is_paged() && ($options["noindex_tag_archives"] == "1") )  ||               // Tag archives (except 1st page)
+            ( is_author() && is_paged() && ($options["noindex_author_archives"] == "1") )             // Author archives (except 1st page)
         ) {
             $metadata_arr[] = '<meta name="robots" content="NOINDEX,FOLLOW" />';
             $do_add_metadata = false;   // No need to process metadata
@@ -121,27 +145,51 @@ function amt_get_metadata_head() {
 
     // Get current post object
     $post = get_queried_object();
-
-    // Check if metadata should be added to this content type.
-    $post_type = get_post_type( $post );
-    if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
-        $do_add_metadata = false;
+    if ( is_null( $post ) ) {
+        // Allow metadata on the default front page (latest posts).
+        // A post object is not available on that page, but we still need to
+        // generate metadata for it. A $post object exists for the "front page"
+        // and the "posts page" when static pages are used. No allow rule needed.
+        if ( ! amt_is_default_front_page() ) {
+            $do_add_metadata = false;
+        }
+    } elseif ( is_singular() ) {
+        // The post type check should only take place on content pages.
+        // Check if metadata should be added to this content type.
+        $post_type = get_post_type( $post );
+        if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
+            $do_add_metadata = false;
+        }
     }
 
     // Add Metadata
     if ($do_add_metadata) {
 
+        // Attachments and embedded media are collected only on content pages.
+        if ( is_singular() ) {
+            // Get an array containing the attachments
+            $attachments = amt_get_ordered_attachments( $post );
+            //var_dump($attachments);
+
+            // Get an array containing the URLs of the embedded media
+            $embedded_media = amt_get_embedded_media( $post );
+            //var_dump($embedded_media);
+        } else {
+            $attachments = array();
+            $embedded_media = array();
+        }
+
         // Basic Meta tags
-        $metadata_arr = array_merge($metadata_arr, amt_add_basic_metadata_head($post));
+        $metadata_arr = array_merge( $metadata_arr, amt_add_basic_metadata_head( $post, $attachments, $embedded_media, $options ) );
         //var_dump(amt_add_basic_metadata());
         // Add Opengraph
-        $metadata_arr = array_merge($metadata_arr, amt_add_opengraph_metadata_head($post));
+        $metadata_arr = array_merge( $metadata_arr, amt_add_opengraph_metadata_head( $post, $attachments, $embedded_media, $options ) );
         // Add Twitter Cards
-        $metadata_arr = array_merge($metadata_arr, amt_add_twitter_cards_metadata_head($post));
+        $metadata_arr = array_merge( $metadata_arr, amt_add_twitter_cards_metadata_head( $post, $attachments, $embedded_media, $options ) );
         // Add Dublin Core
-        $metadata_arr = array_merge($metadata_arr, amt_add_dublin_core_metadata_head($post));
+        $metadata_arr = array_merge( $metadata_arr, amt_add_dublin_core_metadata_head( $post, $attachments, $embedded_media, $options ) );
         // Add Google+ Author/Publisher links
-        $metadata_arr = array_merge($metadata_arr, amt_add_schemaorg_metadata_head($post));
+        $metadata_arr = array_merge( $metadata_arr, amt_add_schemaorg_metadata_head( $post, $attachments, $embedded_media, $options ) );
     }
 
     // Allow filtering of the all the generated metatags
@@ -179,18 +227,42 @@ function amt_get_metadata_footer() {
 
     // Get current post object
     $post = get_queried_object();
-
-    // Check if metadata should be added to this content type.
-    $post_type = get_post_type( $post );
-    if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
-        $do_add_metadata = false;
+    if ( is_null( $post ) ) {
+        // Allow metadata on the default front page (latest posts).
+        // A post object is not available on that page, but we still need to
+        // generate metadata for it. A $post object exists for the "front page"
+        // and the "posts page" when static pages are used. No allow rule needed.
+        if ( ! amt_is_default_front_page() ) {
+            $do_add_metadata = false;
+        }
+    } elseif ( is_singular() ) {
+        // The post type check should only take place on content pages.
+        // Check if metadata should be added to this content type.
+        $post_type = get_post_type( $post );
+        if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
+            $do_add_metadata = false;
+        }
     }
 
     // Add Metadata
     if ($do_add_metadata) {
 
+        // Attachments and embedded media are collected only on content pages.
+        if ( is_singular() ) {
+            // Get an array containing the attachments
+            $attachments = amt_get_ordered_attachments( $post );
+            //var_dump($attachments);
+
+            // Get an array containing the URLs of the embedded media
+            $embedded_media = amt_get_embedded_media( $post );
+            //var_dump($embedded_media);
+        } else {
+            $attachments = array();
+            $embedded_media = array();
+        }
+
         // Add Schema.org Microdata
-        $metadata_arr = array_merge($metadata_arr, amt_add_schemaorg_metadata_footer($post));
+        $metadata_arr = array_merge( $metadata_arr, amt_add_schemaorg_metadata_footer( $post, $attachments, $embedded_media, $options ) );
     }
 
     // Allow filtering of all the generated metatags
@@ -239,16 +311,19 @@ function amt_get_metadata_review() {
 
 function amt_add_metadata_review($post_body) {
 
-    // Get current post object
-    $post = get_queried_object();
+    if ( is_singular() ) {
 
-    // Check if metadata is supported on this content type.
-    $post_type = get_post_type( $post );
-    if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
-        return $post_body;
-    }
+        // Get current post object
+        $post = get_queried_object();
+        if ( is_null( $post ) ) {
+            return $post_body;
+        }
 
-    if ( is_singular() || amt_is_static_front_page() ) {
+        // Check if metadata is supported on this content type.
+        $post_type = get_post_type( $post );
+        if ( ! in_array( $post_type, amt_get_supported_post_types() ) ) {
+            return $post_body;
+        }
 
         // Check if Review Mode is enabled
         $options = get_option("add_meta_tags_opts");

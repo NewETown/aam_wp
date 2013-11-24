@@ -1,5 +1,43 @@
 <?php
 /**
+ *  This file is part of the Add-Meta-Tags distribution package.
+ *
+ *  Add-Meta-Tags is an extension for the WordPress publishing platform.
+ *
+ *  Homepage:
+ *  - http://wordpress.org/plugins/add-meta-tags/
+ *  Documentation:
+ *  - http://www.codetrax.org/projects/wp-add-meta-tags/wiki
+ *  Development Web Site and Bug Tracker:
+ *  - http://www.codetrax.org/projects/wp-add-meta-tags
+ *  Main Source Code Repository (Mercurial):
+ *  - https://bitbucket.org/gnotaras/wordpress-add-meta-tags
+ *  Mirror repository (Git):
+ *  - https://github.com/gnotaras/wordpress-add-meta-tags
+ *  Historical plugin home:
+ *  - http://www.g-loaded.eu/2006/01/05/add-meta-tags-wordpress-plugin/
+ *
+ *  Licensing Information
+ *
+ *  Copyright 2006-2013 George Notaras <gnot@g-loaded.eu>, CodeTRAX.org
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  The NOTICE file contains additional licensing and copyright information.
+ */
+
+
+/**
  * Dublin Core metadata on posts, pages and attachments.
  *
  *  * http://dublincore.org/documents/dcmi-terms/
@@ -7,20 +45,19 @@
  *  * Examples: http://www.metatags.org/dublin_core_metadata_element_set
  *
  *  * Generic Examples: http://dublincore.org/documents/2001/04/12/usageguide/generic.shtml
+ *  * XML examples: http://dublincore.org/documents/dc-xml-guidelines/
  *
  * Module containing functions related to Dublin Core
  */
 
 
-function amt_add_dublin_core_metadata_head( $post ) {
+function amt_add_dublin_core_metadata_head( $post, $attachments, $embedded_media, $options ) {
 
     if ( !is_singular() || is_front_page() ) {  // is_front_page() is used for the case in which a static page is used as the front page.
         // Dublin Core metadata has a meaning for content only.
         return array();
     }
 
-    // Get the options the DB
-    $options = get_option("add_meta_tags_opts");
     $do_auto_dublincore = (($options["auto_dublincore"] == "1") ? true : false );
     if (!$do_auto_dublincore) {
         return array();
@@ -30,51 +67,61 @@ function amt_add_dublin_core_metadata_head( $post ) {
 
     // Title
     // Note: Contains multipage information through amt_process_paged()
-    $metadata_arr[] = '<meta name="dc.title" content="' . esc_attr( amt_process_paged( get_the_title($post->ID) ) ) . '" />';
+    $metadata_arr[] = '<meta name="dcterms.title" content="' . esc_attr( amt_process_paged( get_the_title($post->ID) ) ) . '" />';
 
-    // Resource identifier
-    // TODO: In case of paginated content, get_permalink() still returns the link to the main mage. FIX (#1025)
-    $metadata_arr[] = '<meta name="dcterms.identifier" scheme="dcterms.uri" content="' . esc_url_raw( get_permalink($post->ID) ) . '" />';
+    // Resource identifier - Uses amt_get_permalink_for_multipage()
+    $metadata_arr[] = '<meta name="dcterms.identifier" content="' . esc_url_raw( amt_get_permalink_for_multipage( $post ) ) . '" />';
 
-    $metadata_arr[] = '<meta name="dc.creator" content="' . esc_attr( amt_get_dublin_core_author_notation($post) ) . '" />';
-    //$metadata_arr[] = '<meta name="dc.date" scheme="dc.w3cdtf" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
-    $metadata_arr[] = '<meta name="dcterms.created" scheme="dc.w3cdtf" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
-    $metadata_arr[] = '<meta name="dcterms.available" scheme="dc.w3cdtf" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
-    //$metadata_arr[] = '<meta name="dcterms.issued" scheme="dc.w3cdtf" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
-    $metadata_arr[] = '<meta name="dcterms.modified" scheme="dc.w3cdtf" content="' . esc_attr( amt_iso8601_date($post->post_modified) ) . '" />';
+    $metadata_arr[] = '<meta name="dcterms.creator" content="' . esc_attr( amt_get_dublin_core_author_notation($post) ) . '" />';
+    //$metadata_arr[] = '<meta name="dcterms.date" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
+    $metadata_arr[] = '<meta name="dcterms.created" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
+    $metadata_arr[] = '<meta name="dcterms.available" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
+    //$metadata_arr[] = '<meta name="dcterms.issued" content="' . esc_attr( amt_iso8601_date($post->post_date) ) . '" />';
+    $metadata_arr[] = '<meta name="dcterms.modified" content="' . esc_attr( amt_iso8601_date($post->post_modified) ) . '" />';
  
     // Description
     // We use the same description as the ``description`` meta tag.
     // Note: Contains multipage information through amt_process_paged()
     $content_desc = amt_get_content_description($post);
     if ( !empty($content_desc) ) {
-        $metadata_arr[] = '<meta name="dc.description" content="' . esc_attr( amt_process_paged( $content_desc ) ) . '" />';
+        $metadata_arr[] = '<meta name="dcterms.description" content="' . esc_attr( amt_process_paged( $content_desc ) ) . '" />';
     }
 
     // Keywords
     if ( ! is_attachment() ) {  // Attachments do not support keywords
-        // dc.subject - one for each keyword.
-        $keywords = explode(', ', amt_get_content_keywords($post));
+        // dcterms.subject - one for each keyword.
+        $keywords = explode(',', amt_get_content_keywords($post));
         foreach ( $keywords as $subject ) {
+            $subject = trim( $subject );
             if ( ! empty($subject) ) {
-                $metadata_arr[] = '<meta name="dc.subject" content="' . esc_attr( $subject ) . '" />';
+                $metadata_arr[] = '<meta name="dcterms.subject" content="' . esc_attr( $subject ) . '" />';
             }
         }
     }
 
-    $metadata_arr[] = '<meta name="dc.language" scheme="dcterms.rfc4646" content="' . esc_attr( get_bloginfo('language') ) . '" />';
-    $metadata_arr[] = '<meta name="dc.publisher" scheme="dcterms.uri" content="' . esc_url_raw( get_bloginfo('url') ) . '" />';
+    $metadata_arr[] = '<meta name="dcterms.language" content="' . esc_attr( get_bloginfo('language') ) . '" />';
+    $metadata_arr[] = '<meta name="dcterms.publisher" content="' . esc_url_raw( get_bloginfo('url') ) . '" />';
 
     // Copyright page
     if (!empty($options["copyright_url"])) {
-        $metadata_arr[] = '<meta name="dcterms.rights" scheme="dcterms.uri" content="' . esc_url_raw( get_bloginfo('url') ) . '" />';
-    }
-    // The following requires creative commons configurator
-    if (function_exists('bccl_get_license_url')) {
-        $metadata_arr[] = '<meta name="dcterms.license" scheme="dcterms.uri" content="' . esc_url_raw( bccl_get_license_url() ) . '" />';
+        $metadata_arr[] = '<meta name="dcterms.rights" content="' . esc_url_raw( get_bloginfo('url') ) . '" />';
     }
 
-    $metadata_arr[] = '<meta name="dc.coverage" content="World" />';
+    // License
+    $license_url = '';
+    // The following requires creative commons configurator
+    if (function_exists('bccl_get_license_url')) {
+        $license_url = bccl_get_license_url();
+    }
+    // Allow filtering of the license URL
+    $license_url = apply_filters( 'amt_dublin_core_license', $license_url, $post->ID );
+    // Add metatag if $license_url is not empty.
+    if ( ! empty( $license_url ) ) {
+        $metadata_arr[] = '<meta name="dcterms.license" content="' . esc_url_raw( $license_url ) . '" />';
+    }
+
+    // Coverage
+    $metadata_arr[] = '<meta name="dcterms.coverage" content="World" />';
 
     if ( is_attachment() ) {
 
@@ -83,20 +130,41 @@ function amt_add_dublin_core_metadata_head( $post ) {
         // See why we do not use strstr(): http://www.codetrax.org/issues/1091
         $attachment_type = preg_replace( '#\/[^\/]*$#', '', $mime_type );
 
+        $metadata_arr[] = '<meta name="dcterms.isPartOf" content="' . esc_url_raw( get_permalink( $post->post_parent ) ) . '" />';
+
         if ( 'image' == $attachment_type ) {
-            $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Image" />';
-            $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="' . $mime_type . '" />';
+            $metadata_arr[] = '<meta name="dcterms.type" content="Image" />';
+            $metadata_arr[] = '<meta name="dcterms.format" content="' . $mime_type . '" />';
         } elseif ( 'video' == $attachment_type ) {
-            $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="MovingImage" />';
-            $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="' . $mime_type . '" />';
+            $metadata_arr[] = '<meta name="dcterms.type" content="MovingImage" />';
+            $metadata_arr[] = '<meta name="dcterms.format" content="' . $mime_type . '" />';
         } elseif ( 'audio' == $attachment_type ) {
-            $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Sound" />';
-            $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="' . $mime_type . '" />';
+            $metadata_arr[] = '<meta name="dcterms.type" content="Sound" />';
+            $metadata_arr[] = '<meta name="dcterms.format" content="' . $mime_type . '" />';
         }
 
+        // Finally add the hasFormat
+        $metadata_arr[] = '<meta name="dcterms.hasFormat" content="' . esc_url_raw( $post->guid ) . '" />';
+
     } else {    // Default: Text
-        $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Text" />';
-        $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="text/html" />';
+        $metadata_arr[] = '<meta name="dcterms.type" content="Text" />';
+        $metadata_arr[] = '<meta name="dcterms.format" content="text/html" />';
+
+        // List attachments
+        foreach( $attachments as $attachment ) {
+            $metadata_arr[] = '<meta name="dcterms.hasPart" content="' . esc_url_raw( get_permalink( $attachment->ID ) ) . '" />';
+        }
+
+        // Embedded Media
+        foreach( $embedded_media['images'] as $embedded_item ) {
+            $metadata_arr[] = '<meta name="dcterms.hasPart" content="' . esc_url_raw( $embedded_item['page'] ) . '" />';
+        }
+        foreach( $embedded_media['videos'] as $embedded_item ) {
+            $metadata_arr[] = '<meta name="dcterms.hasPart" content="' . esc_url_raw( $embedded_item['page'] ) . '" />';
+        }
+        foreach( $embedded_media['sounds'] as $embedded_item ) {
+            $metadata_arr[] = '<meta name="dcterms.hasPart" content="' . esc_url_raw( $embedded_item['page'] ) . '" />';
+        }
     }
 
 
@@ -112,20 +180,20 @@ function amt_add_dublin_core_metadata_head( $post ) {
     $format = get_post_format( $post->id );
     if ( empty($format) || $format=="aside" || $format=="link" || $format=="quote" || $format=="status" || $format=="chat") {
         // Default format
-        $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Text" />';
-        $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="text/html" />';
+        $metadata_arr[] = '<meta name="dcterms.type" content="Text" />';
+        $metadata_arr[] = '<meta name="dcterms.format" content="text/html" />';
     } elseif ($format=="gallery") {
-        $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Collection" />';
-        // $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="image" />';
+        $metadata_arr[] = '<meta name="dcterms.type" content="Collection" />';
+        // $metadata_arr[] = '<meta name="dcterms.format" content="image" />';
     } elseif ($format=="image") {
-        $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Image" />';
-        // $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="image/png" />';
+        $metadata_arr[] = '<meta name="dcterms.type" content="Image" />';
+        // $metadata_arr[] = '<meta name="dcterms.format" content="image/png" />';
     } elseif ($format=="video") {
-        $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Moving Image" />';
-        $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="application/x-shockwave-flash" />';
+        $metadata_arr[] = '<meta name="dcterms.type" content="Moving Image" />';
+        $metadata_arr[] = '<meta name="dcterms.format" content="application/x-shockwave-flash" />';
     } elseif ($format=="audio") {
-        $metadata_arr[] = '<meta name="dc.type" scheme="DCMIType" content="Sound" />';
-        $metadata_arr[] = '<meta name="dc.format" scheme="dcterms.imt" content="audio/mpeg" />';
+        $metadata_arr[] = '<meta name="dcterms.type" content="Sound" />';
+        $metadata_arr[] = '<meta name="dcterms.format" content="audio/mpeg" />';
     }
     */
 

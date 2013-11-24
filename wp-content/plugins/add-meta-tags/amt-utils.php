@@ -1,9 +1,45 @@
 <?php
 /**
- * Module containing utility functions.
+ *  This file is part of the Add-Meta-Tags distribution package.
+ *
+ *  Add-Meta-Tags is an extension for the WordPress publishing platform.
+ *
+ *  Homepage:
+ *  - http://wordpress.org/plugins/add-meta-tags/
+ *  Documentation:
+ *  - http://www.codetrax.org/projects/wp-add-meta-tags/wiki
+ *  Development Web Site and Bug Tracker:
+ *  - http://www.codetrax.org/projects/wp-add-meta-tags
+ *  Main Source Code Repository (Mercurial):
+ *  - https://bitbucket.org/gnotaras/wordpress-add-meta-tags
+ *  Mirror repository (Git):
+ *  - https://github.com/gnotaras/wordpress-add-meta-tags
+ *  Historical plugin home:
+ *  - http://www.g-loaded.eu/2006/01/05/add-meta-tags-wordpress-plugin/
+ *
+ *  Licensing Information
+ *
+ *  Copyright 2006-2013 George Notaras <gnot@g-loaded.eu>, CodeTRAX.org
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ *
+ *  The NOTICE file contains additional licensing and copyright information.
  */
 
 
+/**
+ * Module containing utility functions.
+ */
 
 
 /**
@@ -11,19 +47,61 @@
  * for use in wp_kses() function.
  */
 function amt_get_allowed_html_kses() {
-    // Uncomment the following line to allow any HTML element in the Full Meta Tags box.
-    //return array();
-    return array(
-        'meta' => array(
+    // Store supported global attributes to an array
+    // As of http://www.w3schools.com/tags/ref_standardattributes.asp
+    $global_attributes = array(
+        'accesskey' => array(),
+        'class' => array(),
+        'contenteditable' => array(),
+        'contextmenu' => array(),
+        // 'data-*' => array(),
+        'dir' => array(),
+        'draggable' => array(),
+        'dropzone' => array(),
+        'hidden' => array(),
+        'id' => array(),
+        'lang' => array(),
+        'spellcheck' => array(),
+        'style' => array(),
+        'tabindex' => array(),
+        'title' => array(),
+        'translate' => array()
+    );
+
+    // Construct an array of valid elements and attributes
+    $valid_elements_attributes = array(
+        // As of http://www.w3schools.com/tags/tag_meta.asp
+        // plus 'itemprop' and 'property'
+        'meta' => array_merge( array(
             'charset' => array(),
             'content' => array(),
+            'value' => array(),
             'http-equiv' => array(),
             'name' => array(),
             'scheme' => array(),
             'itemprop' => array(),  // schema.org
-            'property' => array(),  // facebook and others
+            'property' => array()  // opengraph and others
+            ), $global_attributes
+        ),
+        // As of http://www.w3schools.com/tags/tag_link.asp
+        'link' => array_merge( array(
+            'charset' => array(),
+            'href' => array(),
+            'hreflang' => array(),
+            'media' => array(),
+            'rel' => array(),
+            'rev' => array(),
+            'sizes' => array(),
+            'target' => array(),
+            'type' => array()
+            ), $global_attributes
         )
     );
+
+    // Allow filtering of $valid_elements_attributes
+    $valid_elements_attributes = apply_filters( 'amt_valid_full_metatag_html', $valid_elements_attributes );
+
+    return $valid_elements_attributes;
 }
 
 
@@ -163,12 +241,33 @@ function amt_process_paged( $data ) {
  * Also, this is even better as the algorithm tries to get text of average
  * length 250 characters, which is more SEO friendly. The algorithm is not
  * perfect, but will do for now.
+ *
+ * MUST return sanitized text.
  */
 function amt_get_the_excerpt( $post, $excerpt_max_len=300, $desc_avg_length=250, $desc_min_length=150 ) {
     
     if ( empty($post->post_excerpt) || get_post_type( $post ) == 'attachment' ) {   // In attachments we always use $post->post_content to get a description
 
         // Here we generate an excerpt from $post->post_content
+
+        // Get the initial data for the excerpt
+        $amt_excerpt = sanitize_text_field( amt_sanitize_description( substr($post->post_content, 0, $excerpt_max_len) ) );
+
+        // Remove any URLs that may exist exactly at the beginning of the description.
+        // This may happen if for example you put a youtube video url first thing in
+        // the post body.
+        $amt_excerpt = preg_replace( '#^https?:[^\t\r\n\s]+#i', '', $amt_excerpt );
+        $amt_excerpt = ltrim( $amt_excerpt );
+
+        // If this was not enough, try to get some more clean data for the description (nasty hack)
+        if ( strlen($amt_excerpt) < $desc_avg_length ) {
+            $amt_excerpt = sanitize_text_field( amt_sanitize_description( substr($post->post_content, 0, (int) ($excerpt_max_len * 1.5)) ) );
+            if ( strlen($amt_excerpt) < $desc_avg_length ) {
+                $amt_excerpt = sanitize_text_field( amt_sanitize_description( substr($post->post_content, 0, (int) ($excerpt_max_len * 2)) ) );
+            }
+        }
+
+/** ORIGINAL ALGO
 
         // Get the initial data for the excerpt
         $amt_excerpt = strip_tags(substr($post->post_content, 0, $excerpt_max_len));
@@ -181,6 +280,7 @@ function amt_get_the_excerpt( $post, $excerpt_max_len=300, $desc_avg_length=250,
             }
         }
 
+*/
         $end_of_excerpt = strrpos($amt_excerpt, ".");
 
         if ($end_of_excerpt) {
@@ -203,7 +303,7 @@ function amt_get_the_excerpt( $post, $excerpt_max_len=300, $desc_avg_length=250,
     } else {
 
         // When the post excerpt has been set explicitly, then it has priority.
-        $amt_excerpt = $post->post_excerpt;
+        $amt_excerpt = sanitize_text_field( amt_sanitize_description( $post->post_excerpt ) );
 
         // NOTE ABOUT ATTACHMENTS: In attachments $post->post_excerpt is the caption.
         // It is usual that attachments have both the post_excerpt and post_content set.
@@ -393,8 +493,8 @@ function amt_get_content_description( $post, $auto=true ) {
         } else {
             // Else, use the post's excerpt. Valid for Pages too.
             if ($auto) {
-                // Here we sanitize the generated excerpt for safety
-                $content_description = sanitize_text_field( amt_sanitize_description( amt_get_the_excerpt($post) ) );
+                // The generated excerpt should already be sanitized.
+                $content_description = amt_get_the_excerpt( $post );
             }
         }
     }
@@ -719,6 +819,59 @@ function amt_get_post_meta_full_metatags($post_id) {
 
 
 /**
+ * Helper function that returns an array of objects attached to the provided
+ * $post object.
+ */
+function amt_get_ordered_attachments( $post ) {
+    // to return IDs:
+    // $attachments = array_values( get_children( array( 'post_parent' => $post->post_parent, 'post_status' => 'inherit', 'post_type' => 'attachment', 'post_mime_type' => 'image', 'order' => 'ASC', 'orderby' => 'menu_order ID' ) ) );
+    return get_children( array(
+        'numberposts' => -1,
+        'post_parent' => $post->ID,
+        'post_type' => 'attachment',
+        'post_status' => 'inherit',
+        //'post_mime_type' => 'image',
+        'order' => 'ASC',
+        'orderby' => 'menu_order ID'
+        )
+    );
+}
+
+
+/**
+ * Helper function that returns the permalink of the provided $post object,
+ * taking into account multipage content.
+ *
+ * ONLY for content.
+ * DO NOT use with:
+ *  - paged archives
+ *  - static page as front page
+ *  - static page as posts index page
+ *
+ * Uses logic from default WordPress function: _wp_link_page
+ *   - http://core.trac.wordpress.org/browser/trunk/src/wp-includes/post-template.php#L705
+ * Also see: wp-includes/canonical.php line: 227 (Post Paging)
+ *
+ */
+function amt_get_permalink_for_multipage( $post ) {
+    $pagenum = get_query_var( 'page' );
+    // Content is multipage
+    if ( $pagenum && $pagenum > 1 ) {
+        // Not using clean URLs -> Add query argument to the URL (eg: ?page=2)
+        if ( '' == get_option('permalink_structure') || in_array( $post->post_status, array('draft', 'pending')) ) {
+            return add_query_arg( 'page', $pagenum, get_permalink($post->ID) );
+        // Using clean URLs
+        } else {
+            return trailingslashit( get_permalink($post->ID) ) . user_trailingslashit( $pagenum, 'single_paged');
+        }
+    // Content is not paged
+    } else {
+        return get_permalink($post->ID);
+    }
+}
+
+
+/**
  *  Helper function that returns true if a static page is used as the homepage
  *  instead of the default posts index page.
  */
@@ -803,36 +956,168 @@ function amt_get_posts_page_id() {
 
 
 /**
- * Opengraph helper functions
+ * Returns an array with URLs to players for some embedded media.
  */
+function amt_get_embedded_media( $post ) {
 
-function amt_get_video_url() {
-    global $post;
+    // Format of the array
+    // Embeds are grouped by type images/videos/sounds
+    // Embedded media are added to any group as an associative array.
+    $embedded_media_urls = array(
+        'images' => array(),
+        'videos' => array(),
+        'sounds' => array()
+    );
+
+    // Find Videos
+    //
+    // Keys:
+    // page - URL to a HTML page that contains the object.
+    // player - URL to the player that can be used in an iframe.
 
     // Youtube
+    // Supported:
+    // - http://www.youtube.com/watch?v=VIDEO_ID
     //$pattern = '#youtube.com/watch\?v=([-|~_0-9A-Za-z]+)#';
-    $pattern = '#http:\/\/(?:www.)?youtube.com\/.*v=(\w*)#';
-    if ( preg_match($pattern, $post->post_content, $matches) ) {
-        return 'http://youtube.com/v/' . $matches[1];
+    //$pattern = '#http:\/\/(?:www.)?youtube.com\/.*v=(\w*)#i';
+    $pattern = '#http:\/\/(?:www.)?youtube.com\/.*v=([a-zA-Z0-9_-]+)#i';
+    preg_match_all( $pattern, $post->post_content, $matches );
+    //var_dump($matches);
+    if ($matches) {
+        // $matches[0] contains a list of YT video URLS
+        // $matches[1] contains a list of YT video IDs
+        // Add matches to $embedded_media_urls
+        foreach( $matches[1] as $youtube_video_id ) {
+            $item = array(
+                'page' => 'http://www.youtube.com/watch?v=' . $youtube_video_id,
+                'player' => 'http://youtube.com/v/' . $youtube_video_id,
+                // Since we can construct the video thumbnail from the ID, we add it
+                'thumbnail' => 'http://img.youtube.com/vi/' . $youtube_video_id . '/0.jpg'
+                // TODO: check http://i1.ytimg.com/vi/FTnqYIkjSjQ/maxresdefault.jpg    MAXRES
+            );
+            array_unshift( $embedded_media_urls['videos'], $item );
+        }
     }
 
     // Vimeo
+    // Supported:
+    // - http://vimeo.com/VIDEO_ID
     //$pattern = '#vimeo.com/([-|~_0-9A-Za-z]+)#';
-    $pattern = '#http:\/\/(?:www.)?vimeo.com\/(\d*)#';
-    if ( preg_match($pattern, $post->post_content, $matches) ) {
-        //return 'http://vimeo.com/couchmode/' . $matches[1];
-        //return 'http://vimeo.com/moogaloop.swf?clip_id=' . $matches[1];
-        return 'http://player.vimeo.com/video/' . $matches[1];
+    $pattern = '#http:\/\/(?:www.)?vimeo.com\/(\d*)#i';
+    preg_match_all( $pattern, $post->post_content, $matches );
+    //var_dump($matches);
+    if ($matches) {
+        // $matches[0] contains a list of Vimeo video URLS
+        // $matches[1] contains a list of Vimeo video IDs
+        // Add matches to $embedded_media_urls
+        foreach( $matches[1] as $vimeo_video_id ) {
+            $item = array(
+                'page' => 'http://vimeo.com/' . $vimeo_video_id,
+                'player' => 'http://player.vimeo.com/video/' . $vimeo_video_id,
+                'thumbnail' => ''
+            );
+            array_unshift( $embedded_media_urls['videos'], $item );
+        }
     }
 
-    // <video> element
-    //$pattern = '#<video.*src="([^"]+)"#';
-    //if ( preg_match($pattern, $post->post_content, $matches) ) {
-    //    var_dump($matches);
-    //    return 'http://player.vimeo.com/video/' . $matches[1];
-    //}
+    // Find Sounds
+    //
+    // Keys:
+    // page - URL to a HTML page that contains the object.
+    // player - URL to the player that can be used in an iframe.
 
-    return '';
+    // Soundcloud
+    // Supported:
+    // - https://soundcloud.com/USER_ID/TRACK_ID
+    // player:
+    // https://w.soundcloud.com/player/?url=https://api.soundcloud.com/tracks/117455833
+    $pattern = '#https?:\/\/(?:www.)?soundcloud.com\/[^/]+\/[a-zA-Z0-9_-]+#i';
+    preg_match_all( $pattern, $post->post_content, $matches );
+    //var_dump($matches);
+    if ($matches) {
+        // $matches[0] contains a list of Soundcloud URLS
+        // Add matches to $embedded_media_urls
+        foreach( $matches[0] as $soundcloud_url ) {
+            $item = array(
+                'page' => $soundcloud_url,
+                'player' => 'https://w.soundcloud.com/player/?url=' . $soundcloud_url
+            );
+            array_unshift( $embedded_media_urls['sounds'], $item );
+        }
+    }
+
+    // Find Images
+    //
+    // Keys:
+    // page - URL to a HTML page that contains the object.
+    // player - URL to the player that can be used in an iframe.
+    // thumbnail - URL to thumbnail
+    // image - URL to image
+    // alt - alt text
+    // width - image width
+    // height - image height
+
+    // Flickr
+    //
+    // Supported:
+    // Embedded URLs MUST be of Format: http://www.flickr.com/photos/USER_ID/IMAGE_ID/
+    //
+    // Sizes:
+    // t - Thumbnail (100x)
+    // q - Square 150 (150x150)
+    // s - Small 240 (140x)
+    // n - Small 320 (320x)
+    // m - Medium 500 (500x)
+    // z - Medium 640 (640x)
+    // c - Large 800 (800x)
+    // b - Large 900 (900x)
+    // l - Large 1024 (1024x)   DOES NOT WORK
+    // h - High 1600 (1600x) DOES NOT WORK
+    //
+    $pattern = '#https?:\/\/(?:www.)?flickr.com\/photos\/[^\/]+\/[^\/]+\/#i';
+    //$pattern = '#https?://(?:www.)?flickr.com/photos/[^/]+/[^/]+/#i';
+    preg_match_all( $pattern, $post->post_content, $matches );
+    //var_dump($matches);
+    if ($matches) {
+        // $matches[0] contains a list of Flickr image page URLS
+        // Add matches to $embedded_media_urls
+        foreach( $matches[0] as $flick_page_url ) {
+
+            // Get cached HTML data for embedded images.
+            // Do it like WordPress.
+            // See source code:
+            // - class-wp-embed.php: line 177 [[ $cachekey = '_oembed_' . md5( $url . serialize( $attr ) ); ]]
+            // - media.php: line 1332 [[ function wp_embed_defaults ]]
+            // If no attributes have been used in the [embed] shortcode, $attr is an empty string.
+            $attr = '';
+            $attr = wp_parse_args( $attr, wp_embed_defaults() );
+            $cachekey = '_oembed_' . md5( $flick_page_url . serialize( $attr ) );
+            $cache = get_post_meta( $post->ID, $cachekey, true );
+            //var_dump($cache);
+
+            // Get image info from the cached HTML
+            preg_match( '#<img src="([^"]+)" alt="([^"]+)" width="([\d]+)" height="([\d]+)" \/>#i', $cache, $img_info );
+            //var_dump($img_info);
+            if ( ! empty( $img_info ) ) {
+                $item = array(
+                    'page' => $flick_page_url,
+                    'player' => $flick_page_url . 'lightbox/',
+                    'thumbnail' => str_replace( 'z.jpg', 'q.jpg', $img_info[1] ),   // size q   BEFORE CHANGING this check if the 150x150 is hardcoded into any metadata generator. It is in Twitter cards.
+                    'image' => $img_info[1],    // size z
+                    'alt' => $img_info[2],
+                    'width' => $img_info[3],
+                    'height' => $img_info[4]
+                );
+                array_unshift( $embedded_media_urls['images'], $item );
+            }
+        }
+    }
+
+    // Allow filtering of the embedded media array
+    $embedded_media_urls = apply_filters( 'amt_embedded_media', $embedded_media_urls, $post->ID );
+
+    //var_dump($embedded_media_urls);
+    return $embedded_media_urls;
 }
 
 
