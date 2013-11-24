@@ -17,9 +17,9 @@ $img = $imgarr[rand(0,2)];
 	$cat = 0;
 
 	if ($pagename == "projects")
-		$cat = 3;
+		$cat = 261;
 	elseif ($pagename == "products")
-		$cat = 4;
+		$cat = 271;
 
     $args = array(
                    'cat' => $cat

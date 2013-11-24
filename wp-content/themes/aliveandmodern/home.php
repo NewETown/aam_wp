@@ -12,7 +12,7 @@ $img = $imgarr[rand(0,2)];
 
 	<?php
     $args = array(
-                   'cat' => 2
+                   'cat' => 221
                    );
 	$blog = new WP_Query($args); ?>
 
