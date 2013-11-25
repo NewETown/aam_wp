@@ -3,7 +3,9 @@
 <!-- <?php get_sidebar(); ?> -->
 
 <?php 
-$imgarr = array('http://aamwp.azurewebsites.net/wp-content/themes/aliveandmodern/img/hero_1.JPG', 'http://aamwp.azurewebsites.net/wp-content/themes/aliveandmodern/img/hero_2.JPG', 'http://aamwp.azurewebsites.net/wp-content/themes/aliveandmodernimg/hero_3.JPG');
+$imgarr = array('http://aamwp.azurewebsites.net/wp-content/themes/aliveandmodern/img/hero_1.JPG',
+				'http://aamwp.azurewebsites.net/wp-content/themes/aliveandmodern/img/hero_2.JPG',
+				'http://aamwp.azurewebsites.net/wp-content/themes/aliveandmodern/img/hero_3.JPG');
 $img = $imgarr[rand(0,2)];
 ?>
 
