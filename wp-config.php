@@ -35,6 +35,8 @@ define('DB_COLLATE', '');
 
 define( 'WP_MEMORY_LIMIT', '64M' );
 
+@define(‘ADMIN_COOKIE_PATH’, ‘/’);
+
 /**#@+
  * Authentication Unique Keys and Salts.
  *
