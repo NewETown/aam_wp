@@ -2,7 +2,7 @@
         <p class="pull-right"><a href="mailto:everett@aliveandmodern.com">Contact</a></p>
         <p>&#169; 2013 Alive and Modern, theme by <a href="http://www.linkedin.com/in/everettcarney/">Everett Carney</a></p>
       </footer>
-    </div>
+    </div> <!-- End Body Container -->
 
     <?php wp_footer(); ?>
 

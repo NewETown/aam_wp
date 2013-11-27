@@ -14,7 +14,7 @@ $img = $imgarr[rand(0,2)];
 
 
 <div id="blog">
-	<div class="col-md-offset-3">
+	<div class="col-md-offset-2 col-md-10">
 	
 	    <?php if(have_posts()) : ?><?php while(have_posts()) : the_post(); ?>
 	     
@@ -27,8 +27,9 @@ $img = $imgarr[rand(0,2)];
 			    </div>
 			</div>
 		</div>
-		<div class="row row-custom">
-		<div>
+	</div>
+	<div class="row row-custom">
+		<div class="col-md-offset-2 col-md-10">
 			<div class="fb-comments" data-href="<?php echo the_permalink() ?>" data-colorscheme="light" data-numposts="5" data-width="The pixel width of the plugin"></div>
 		</div>
 	</div>
@@ -37,7 +38,6 @@ $img = $imgarr[rand(0,2)];
 	<?php endwhile; ?>
 	
 	<?php endif; ?>
-	</div>
 </div>
 
 <?php get_footer(); ?>
