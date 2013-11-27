@@ -17,6 +17,10 @@ Gun-Metal Green             gmg               #66FF66
     background-position: center bottom;
 }
 
+#blog > .row {
+    padding-bottom: 10px;
+}
+
 /* ************************************* */
 
 body {
